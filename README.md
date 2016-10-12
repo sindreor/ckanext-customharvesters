@@ -29,3 +29,23 @@ This extension is a modification of the already existing extension that can be f
         ckan.plugins = dcat dcat_rdf_harvester dcat_json_harvester dcat_json_interface geonorgeHarvester
 
 ## How to harvest data
+
+When a harvest job is started by a user in the Web UI, or by a scheduled
+harvest, the harvest is started by the ``harvester run`` command. This is the
+normal method in production systems and scales well.
+
+In this case, the harvesting extension uses two different queues: one that
+handles the gathering and another one that handles the fetching and importing.
+To start the consumers run the following command (make sure you have your
+python environment activated)::
+
+      (pyenv) $ paster --plugin=ckanext-harvest harvester gather_consumer --config=/etc/ckan/default/production.ini
+
+On another terminal, run the following command::
+
+      (pyenv) $ paster --plugin=ckanext-harvest harvester fetch_consumer --config=/etc/ckan/default/production.ini
+
+Finally, on a third console, run the following command to start any
+pending harvesting jobs::
+
+      (pyenv) $ paster --plugin=ckanext-harvest harvester run --config=/etc/ckan/default/production.ini
