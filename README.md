@@ -28,14 +28,9 @@ This extension is a modification of the already existing extension that can be f
 
         ckan.plugins = dcat dcat_rdf_harvester dcat_json_harvester dcat_json_interface geonorgeHarvester datanorgeHarvester
 
-4.  Enable the required plugins in your ini file:
+5.  Enable the required plugins in your ini file:
 
-        ckan.plugins = dcat dcat_rdf_harvester dcat_json_harvester dcat_json_interface geonorgeHarvester datanorgeHarvester
-
-
-5. Restart apache:
-	   
-	  sudo service apache2 restart
+        sudo service apache2 restart
 
 ## How to harvest data
 
