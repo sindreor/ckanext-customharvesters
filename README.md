@@ -30,6 +30,10 @@ This extension is a modification of the already existing extension that can be f
 
 ## How to harvest data
 
+First you need to create a harvest source which is using one of the harvesters from this extension. This can be done at http://yourIP/harvest. 
+
+After the harvest source is created, you need to create a harvest job. This is done by clicking at the created harvest source, and then choosing "reharvest"
+
 When a harvest job is started by a user in the Web UI, or by a scheduled
 harvest, the harvest is started by the ``harvester run`` command. This is the
 normal method in production systems and scales well.
