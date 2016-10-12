@@ -25,8 +25,9 @@ setup(
 
     [ckan.plugins]
     dcat_xml_harvester=ckanext.dcat.harvesters:DCATXMLHarvester
-    dcat_json_harvester=ckanext.dcat.harvesters.customHarvesters:DCATJSONHarvester
+    dcat_json_harvester=ckanext.dcat.harvesters:DCATJSONHarvester
     geonorgeHarvester=ckanext.dcat.harvesters.customHarvesters:GeoNorgeHarvester
+    datanorgeHarvester=ckanext.dcat.harvesters.customHarvesters:DataNorgeHarvester
     dcat_rdf_harvester=ckanext.dcat.harvesters:DCATRDFHarvester
 
     dcat_json_interface=ckanext.dcat.plugins:DCATJSONInterface
