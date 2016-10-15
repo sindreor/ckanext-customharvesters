@@ -310,7 +310,7 @@ class DCATHarvester(HarvesterBase):
         dict['harvested_guid']=harvest_object.guid
         dict['excluded_resources']=excluded_resources
         return dict
-        
+
 
     def append_provenance_data(self, package_dict, harvest_object, type, excluded_resources):
         for dict in package_dict['extras']:
@@ -447,7 +447,7 @@ class DCATHarvester(HarvesterBase):
 
                 provenance_dict=json.loads(provenance_data)
 
-                #THIS FUNCTIONALITY SHOULD BE TESTED WITH MORE THAN JUST 1 EXCLUDED RESOURCE
+                
                 new_exclude=[]
                 for res in package_dict.get('resources',[]): #This part ckecks if a resource has been excluded, then it should not be updated into the dataset
                     if((res['url'] in provenance_dict[0]['excluded_resources']) and (self.check_resource_existence(res["url"]))):
