@@ -301,35 +301,22 @@ class DCATHarvester(HarvesterBase):
                    return True
         return False #Returned if the resource is not in any existing dataset
 
-    def get_metadata_provenance_for_just_this_harvest(cls, harvest_object, type):
+    def get_metadata_provenance_for_just_this_harvest(cls, harvest_object, type, excluded_resources):
         dict={}
         dict['activity_ocurred']=datetime.datetime.utcnow().isoformat()
         dict['activity']=type
         dict['harvest_sorce_url']=harvest_object.source.url
         dict['harvest_source_title']=harvest_object.source.title
         dict['harvested_guid']=harvest_object.guid
+        dict['excluded_resources']=excluded_resources
         return dict
-        '''
-        #String format
-        data_string=''
-        data_string+='NEW ACTIVITY:{'
-        data_string+='activity_occurred: '+ datetime.datetime.utcnow().isoformat()+'; '
-        data_string+='activity: '+type+'; '
-        data_string+='harvest_source_url: '+harvest_object.source.url+'; '
-        data_string+='harvest_source_title: '+harvest_object.source.title+'; '
-        data_string+='harvest_source_type: '+harvest_object.source.type+'; '
-        data_string+='harvested_guid: '+harvest_object.guid+'; '
-        if(harvest_object.metadata_modified_date):
-            data_string+='harvested_metadata_modified: '+harvest_object.metadata_modified_date.isoformat()+';'
-        data_string+='}'
-        return data_string
-        '''
+        
 
-    def append_provenance_data(self, package_dict, harvest_object, type):
+    def append_provenance_data(self, package_dict, harvest_object, type, excluded_resources):
         for dict in package_dict['extras']:
             if(dict['key']=='metadata_provenance'):
                 data_dict=json.loads(dict['value'])
-                data_dict.append(self.get_metadata_provenance_for_just_this_harvest(harvest_object, type))
+                data_dict.append(self.get_metadata_provenance_for_just_this_harvest(harvest_object, type, excluded_resources))
                 dict['value']=json.dumps(data_dict)
 
         return package_dict
@@ -414,15 +401,17 @@ class DCATHarvester(HarvesterBase):
             will be created.
             '''
             dropped=''
+            excluded_resources=[]
             for res in package_dict["resources"]:
 
                 if(self.check_resource_existence(res["url"])):
                     dropped+=res['url']+' '
+                    excluded_resources.append(res["url"])
                     package_dict["resources"].remove(res)
             if(not package_dict["resources"]):#If list of resources is empty
                 log.info('Dataset with ID '+harvest_object.guid+' and resource'+dropped+' not created, resources already exists')
             else:
-                self.append_provenance_data(package_dict,harvest_object,"initial_harvest")#Adding provenance data to dataset
+                self.append_provenance_data(package_dict,harvest_object,"initial_harvest", excluded_resources)#Adding provenance data to dataset
 
                 package_schema = logic.schema.default_create_package_schema()
                 context['schema'] = package_schema
@@ -446,26 +435,72 @@ class DCATHarvester(HarvesterBase):
         elif status == 'change':
 
             try:
+
                 #This part adds old provenance data to the new package_dict
                 provenance_data=""
                 #print(logic.action.get.package_show({'model': model, 'user': self._get_user_name()}, {"id":harvest_object.package_id})["extras"])
                 database_package=logic.action.get.package_show({'model': model, 'user': self._get_user_name()}, {"id":harvest_object.package_id})
+                provenance_data=''
                 for key in database_package.get('extras', []):
                     if(key['key']=="metadata_provenance"):
                         provenance_data=key['value']
+
+                provenance_dict=json.loads(provenance_data)
+
+                #THIS FUNCTIONALITY SHOULD BE TESTED WITH MORE THAN JUST 1 EXCLUDED RESOURCE
+                new_exclude=[]
+                for res in package_dict.get('resources',[]): #This part ckecks if a resource has been excluded, then it should not be updated into the dataset
+                    if((res['url'] in provenance_dict[0]['excluded_resources']) and (self.check_resource_existence(res["url"]))):
+                        package_dict['resources'].remove(res)
+                        new_exclude.append(res["url"])
 
                 for key in package_dict.get('extras',[]):
                     if(key['key']=='metadata_provenance'):
                         key['value']=(provenance_data)
 
-                self.append_provenance_data(package_dict, harvest_object, "reharvest")  # Adding new provenance data to dataset
+                self.append_provenance_data(package_dict, harvest_object, "reharvest",new_exclude)  # Adding new provenance data to dataset
 
                 #Update the package
                 package_dict['id'] = harvest_object.package_id
                 package_id = p.toolkit.get_action('package_update')(context, package_dict)
                 log.info('Updated dataset with id %s', package_id)
-            except: #If package does not exist, the reason is that it was skipped in an earlier harvest, it should therefore be ignored
-                log.debug("Package not updated. An error occurred when fetching the existing package.")
+            except: #If package does not exist, the reason is that it was skipped in an earlier harvest. We try to make a new package where it is tested if it still needs to be skipped
+                log.info("Package not updated. Thries to create a new package instead.")
+
+                dropped = ''
+                excluded_resources = []
+                for res in package_dict["resources"]:
+
+                    if (self.check_resource_existence(res["url"])):
+                        dropped += res['url'] + ' '
+                        excluded_resources.append(res["url"])
+                        package_dict["resources"].remove(res)
+                if (not package_dict["resources"]):  # If list of resources is empty
+                    log.info(
+                        'Dataset with ID ' + harvest_object.guid + ' and resource' + dropped + ' not created, resources already exists')
+                else:
+                    self.append_provenance_data(package_dict, harvest_object, "initial_harvest",
+                                                excluded_resources)  # Adding provenance data to dataset
+
+                    package_schema = logic.schema.default_create_package_schema()
+                    context['schema'] = package_schema
+
+                    # We need to explicitly provide a package ID
+                    package_dict['id'] = unicode(uuid.uuid4())
+                    package_schema['id'] = [unicode]
+
+                    # Save reference to the package on the object
+                    harvest_object.package_id = package_dict['id']
+                    harvest_object.add()
+
+                    # Defer constraints and flush so the dataset can be indexed with
+                    # the harvest object id (on the after_show hook from the harvester
+                    # plugin)
+                    model.Session.execute('SET CONSTRAINTS harvest_object_package_id_fkey DEFERRED')
+                    model.Session.flush()
+
+                    package_id = p.toolkit.get_action('package_create')(context, package_dict)
+                    log.info('Created dataset with id %s', package_id)
 
 
         model.Session.commit()
